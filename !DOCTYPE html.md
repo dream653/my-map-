@@ -1,0 +1,2086 @@
+<!DOCTYPE html>
+
+<html lang="ru">
+
+<head>
+
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+
+<title>Карта боевых действий — DeepState Style</title>
+
+<!-- Стили Leaflet -->
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.css" />
+
+<style>
+
+:root {
+
+\&#x20; --ds-bg: rgba(22, 24, 30, 0.92);
+
+\&#x20; --ds-bg-hover: rgba(36, 39, 50, 0.95);
+
+\&#x20; --ds-border: rgba(255, 255, 255, 0.08);
+
+\&#x20; --ds-border-active: rgba(255, 255, 255, 0.2);
+
+\&#x20; --ds-red: #d9383a;
+
+\&#x20; --ds-blue: #2b68d8;
+
+\&#x20; --ds-grey: #646e7c;
+
+\&#x20; --ds-orange: #e67e22;
+
+\&#x20; --ds-green: #27ae60;
+
+\&#x20; --text-main: #e1e4e8;
+
+\&#x20; --text-muted: #8b949e;
+
+}
+
+
+
+\\\* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color: transparent; }
+
+html, body { height:100%; background:#0d0e12; font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; overflow:hidden; user-select:none; color: var(--text-main); touch-action: none; }
+
+\\#map {
+
+\&#x20; width:100%;
+
+\&#x20; height:100%;
+
+\&#x20; background:#0d0e12;
+
+\&#x20; cursor:crosshair;
+
+\&#x20; /\\\* Разрешаем JS полностью управлять жестом карты при рисовании \\\*/
+
+\&#x20; touch-action:none;
+
+}
+
+\\#map.leaflet-container {
+
+\&#x20; touch-action:none;
+
+}
+
+
+
+
+
+/\\\* Кастомизация контролов Leaflet \\\*/
+
+.leaflet-control-zoom { border:none !important; margin-right:15px !important; margin-bottom:120px !important; }
+
+.leaflet-control-zoom a { background-color: var(--ds-bg) !important; color:#fff !important; border:1px solid var(--ds-border) !important; backdrop-filter:blur(10px); border-radius:8px !important; margin-bottom:4px; box-shadow:0 4px 16px rgba(0,0,0,0.4); }
+
+.leaflet-control-zoom a:hover { background-color: var(--ds-bg-hover) !important; }
+
+
+
+/\\\* Шапка DeepState \\\*/
+
+.ds-header {
+
+\&#x20; position:fixed; top:calc(12px + env(safe-area-inset-top, 0px)); left:12px; z-index:1000;
+
+\&#x20; background: var(--ds-bg); padding:8px 14px; border-radius:10px;
+
+\&#x20; backdrop-filter:blur(12px); border:1px solid var(--ds-border); box-shadow:0 8px 24px rgba(0,0,0,0.5);
+
+\&#x20; display:flex; align-items:center; gap:10px; pointer-events:none;
+
+}
+
+.ds-logo { font-size:12px; font-weight:800; letter-spacing:1px; text-transform:uppercase; color:#fff; display:flex; align-items:center; gap:8px; }
+
+.pulse-dot { width:8px; height:8px; background:var(--ds-red); border-radius:50%; box-shadow:0 0 10px var(--ds-red); animation: pulse 2s infinite; }
+
+
+
+@keyframes pulse {
+
+\&#x20; 0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(217, 56, 58, 0.7); }
+
+\&#x20; 70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(217, 56, 58, 0); }
+
+\&#x20; 100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(217, 56, 58, 0); }
+
+}
+
+
+
+/\\\* Легенда \\\*/
+
+.ds-legend {
+
+\&#x20; position:fixed; top:calc(55px + env(safe-area-inset-top, 0px)); left:12px; z-index:1000;
+
+\&#x20; background: var(--ds-bg); padding:10px 14px; border-radius:10px;
+
+\&#x20; backdrop-filter:blur(12px); border:1px solid var(--ds-border); min-width:160px; box-shadow:0 8px 24px rgba(0,0,0,0.5);
+
+}
+
+.ds-legend-title { font-size:9px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:6px; }
+
+.ds-legend-item { display:flex; align-items:center; gap:8px; margin-bottom:5px; font-size:11px; font-weight:500; }
+
+.ds-legend-item:last-child { margin-bottom:0; }
+
+.ds-color { width:10px; height:10px; border-radius:3px; flex-shrink:0; }
+
+
+
+/\\\* Панель инструментов \\\*/
+
+.ds-toolbar {
+
+\&#x20; position:fixed; top:calc(12px + env(safe-area-inset-top, 0px)); right:12px; z-index:1000;
+
+\&#x20; background: var(--ds-bg); padding:10px; border-radius:12px;
+
+\&#x20; backdrop-filter:blur(12px); border:1px solid var(--ds-border);
+
+\&#x20; display:flex; flex-direction:column; gap:5px; width:210px; box-shadow:0 8px 24px rgba(0,0,0,0.5);
+
+\&#x20; max-height: calc(100vh - 120px); overflow-y: auto;
+
+}
+
+.ds-toolbar-title { font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:4px; padding-left:4px; }
+
+
+
+.ds-btn {
+
+\&#x20; background: rgba(255,255,255,0.03); border:1px solid var(--ds-border); color:var(--text-main);
+
+\&#x20; padding:8px 10px; border-radius:8px; font-size:12px; font-weight:500; text-align:left; cursor:pointer;
+
+\&#x20; transition:all 0.15s ease; display:flex; align-items:center; gap:8px; flex-shrink:0;
+
+}
+
+.ds-btn:hover { background: var(--ds-bg-hover); border-color: var(--ds-border-active); }
+
+.ds-btn.active { background: rgba(43, 104, 216, 0.25); border-color: var(--ds-blue); color:#fff; }
+
+.ds-btn.eraser-active { background: rgba(230, 126, 34, 0.25); border-color: var(--ds-orange); color:#fff; }
+
+
+
+.ds-divider { height:1px; background: var(--ds-border); margin:4px 0; }
+
+
+
+.ds-control {
+
+\&#x20; background: rgba(0,0,0,0.2); border: 1px solid var(--ds-border);
+
+\&#x20; padding: 8px; border-radius: 8px; display: flex; flex-direction: column; gap: 4px;
+
+}
+
+.ds-control-label { font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; font-weight: 600; }
+
+.ds-range { width: 100%; accent-color: var(--ds-grey); cursor: pointer; height: 4px; }
+
+
+
+.ds-date-input {
+
+\&#x20; background: rgba(0,0,0,0.5); border: 1px solid var(--ds-border); color: #fff;
+
+\&#x20; padding: 5px 8px; border-radius: 6px; font-size: 11px; outline: none; width: 100%;
+
+}
+
+
+
+/\\\* Нижняя панель таймлайна \\\*/
+
+.ds-timeline {
+
+\&#x20; position:fixed; bottom:calc(12px + env(safe-area-inset-bottom, 0px)); left:50%; transform:translateX(-50%); z-index:1000;
+
+\&#x20; background: var(--ds-bg); padding:8px 16px; border-radius:24px;
+
+\&#x20; backdrop-filter:blur(12px); border:1px solid var(--ds-border);
+
+\&#x20; display:flex; align-items:center; gap:12px; box-shadow:0 8px 28px rgba(0,0,0,0.6);
+
+\&#x20; width: calc(100% - 24px); max-width: 800px;
+
+}
+
+.ds-play-btn {
+
+\&#x20; background: var(--ds-blue); border:none; color:#fff; width:34px; height:34px; border-radius:50%;
+
+\&#x20; font-size:12px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:0.2s; flex-shrink:0;
+
+}
+
+.ds-play-btn:hover { background: #3d78e3; transform:scale(1.05); }
+
+
+
+.ds-speed-select {
+
+\&#x20; background: rgba(255,255,255,0.05); border:1px solid var(--ds-border);
+
+\&#x20; color:#fff; padding:5px 6px; border-radius:6px; font-size:11px; outline:none; cursor:pointer; font-weight:600;
+
+}
+
+.ds-speed-select option { background:#16181e; color:#fff; }
+
+
+
+.ds-slider-wrapper { flex:1; display:flex; align-items:center; }
+
+.ds-timeline-slider { width:100%; accent-color: var(--ds-blue); cursor:pointer; height:4px; }
+
+
+
+.ds-step-info { font-size:11px; color:#fff; font-weight:600; white-space:nowrap; min-width:130px; text-align:right; }
+
+
+
+.save-hint { font-size:10px; color:var(--ds-green); text-align:center; height:12px; font-weight:600; }
+
+
+
+/\\\* Метки карты \\\*/
+
+.pin-dot { width:8px; height:8px; border-radius:50%; background:var(--ds-blue); border:2px solid #fff; box-shadow:0 0 6px rgba(43,104,216,0.9); }
+
+.pin-label { color:#fff; font-size:11px; font-weight:600; text-shadow:0 0 4px #000, 0 0 8px #000; white-space:nowrap; transform:translate(8px,-6px); }
+
+
+
+.ruler-label {
+
+\&#x20; background: rgba(18, 20, 26, 0.95); border: 1px solid var(--ds-orange); color: #fff;
+
+\&#x20; padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 600; white-space: nowrap;
+
+\&#x20; box-shadow: 0 4px 12px rgba(0,0,0,0.5); backdrop-filter: blur(8px);
+
+}
+
+
+
+@media (max-width: 768px) {
+
+\&#x20; .ds-legend { display:none; }
+
+\&#x20; .leaflet-control-zoom { display:none !important; }
+
+
+
+\&#x20; .ds-toolbar {
+
+\&#x20;   top: auto;
+
+\&#x20;   bottom: calc(65px + env(safe-area-inset-bottom, 0px));
+
+\&#x20;   left: 10px; right: 10px;
+
+\&#x20;   width: auto; max-height: none;
+
+\&#x20;   flex-direction: row; overflow-x: auto;
+
+\&#x20;   padding: 6px 8px; gap: 6px; align-items: center;
+
+\&#x20;   border-radius: 14px;
+
+\&#x20;   -webkit-overflow-scrolling: touch;
+
+\&#x20; }
+
+\&#x20; 
+
+\&#x20; .ds-toolbar::-webkit-scrollbar { display: none; }
+
+\&#x20; .ds-toolbar-title, .save-hint, .ds-divider, .ds-control { display:none; }
+
+
+
+\&#x20; .ds-btn {
+
+\&#x20;   padding: 8px 12px;
+
+\&#x20;   font-size: 11px;
+
+\&#x20;   border-radius: 8px;
+
+\&#x20;   white-space: nowrap;
+
+\&#x20; }
+
+
+
+\&#x20; .ds-timeline {
+
+\&#x20;   width: calc(100% - 20px);
+
+\&#x20;   bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+
+\&#x20;   padding: 6px 10px;
+
+\&#x20;   gap: 8px;
+
+\&#x20; }
+
+
+
+\&#x20; .ds-step-info {
+
+\&#x20;   font-size: 10px;
+
+\&#x20;   min-width: auto;
+
+\&#x20;   max-width: 100px;
+
+\&#x20;   overflow: hidden;
+
+\&#x20;   text-overflow: ellipsis;
+
+\&#x20; }
+
+
+
+\&#x20; .ds-speed-select {
+
+\&#x20;   padding: 4px 4px;
+
+\&#x20;   font-size: 10px;
+
+\&#x20; }
+
+}
+
+
+</head>
+
+<body>
+
+<div id="map"></div>
+
+
+
+<div class="ds-header">
+
+&#x20; <div class="ds-logo"><span class="pulse-dot"></span> DeepState Map</div>
+
+</div>
+
+
+
+<div class="ds-legend">
+
+&#x20; <div class="ds-legend-title">Легенда</div>
+
+&#x20; <div class="ds-legend-item"><div class="ds-color" style="background:rgba(217,56,58,0.6);border:1px solid #d9383a;"></div><span>Контроль РФ</span></div>
+
+&#x20; <div class="ds-legend-item"><div class="ds-color" style="background:rgba(43,104,216,0.6);border:1px solid #2b68d8;"></div><span>Контроль ВСУ</span></div>
+
+&#x20; <div class="ds-legend-item"><div class="ds-color" style="background:rgba(100,110,124,0.6);border:1px dashed #646e7c;"></div><span>Серая зона</span></div>
+
+</div>
+
+
+
+<div class="ds-toolbar" id="toolbar">
+
+&#x20; <div class="ds-toolbar-title">Инструменты</div>
+
+&#x20; <button class="ds-btn active" data-tool="none">🖱 Обзор</button>
+
+&#x20; <button class="ds-btn" data-tool="add-marker">📍 Метка</button>
+
+&#x20; <button class="ds-btn" data-tool="zone-rf">🟥 РФ</button>
+
+&#x20; <button class="ds-btn" data-tool="zone-ua">🟦 ВСУ</button>
+
+&#x20; <button class="ds-btn" data-tool="eraser">🧹 Ластик</button>
+
+&#x20; <button class="ds-btn" data-tool="ruler">📏 Линейка</button>
+
+&#x20;
+
+&#x20; <div class="ds-divider"></div>
+
+&#x20;
+
+&#x20; <div class="ds-control">
+
+&#x20;   <div class="ds-control-label">
+
+&#x20;     <span>Серая зона:</span>
+
+&#x20;     <span id="greyZoneVal">2.0 км</span>
+
+&#x20;   </div>
+
+&#x20;   <input type="range" class="ds-range" id="greyZoneSlider" min="0" max="10" step="0.5" value="2.0">
+
+&#x20; </div>
+
+
+
+&#x20; <div class="ds-control">
+
+&#x20;   <div class="ds-control-label"><span>Дата наступления:</span></div>
+
+&#x20;   <input type="date" class="ds-date-input" id="attackDateInput">
+
+&#x20; </div>
+
+
+
+&#x20; <div class="ds-divider"></div>
+
+&#x20; <button class="ds-btn" id="undoBtn">↩️ Отмена</button>
+
+&#x20; <button class="ds-btn" id="resetBtn">🔄 Сброс</button>
+
+&#x20; <div class="save-hint" id="saveHint"></div>
+
+</div>
+
+
+
+<div class="ds-timeline">
+
+&#x20; <button class="ds-play-btn" id="playBtn">▶</button>
+
+&#x20; <select class="ds-speed-select" id="speedSelect">
+
+&#x20;   <option value="0.5">0.5x</option>
+
+&#x20;   <option value="1" selected>1x</option>
+
+&#x20;   <option value="1.5">1.5x</option>
+
+&#x20;   <option value="2">2x</option>
+
+&#x20;   <option value="4">4x</option>
+
+&#x20; </select>
+
+&#x20; <div class="ds-slider-wrapper">
+
+&#x20;   <input type="range" class="ds-timeline-slider" id="timelineSlider" min="0" max="0" value="0">
+
+&#x20; </div>
+
+&#x20; <div class="ds-step-info" id="timelineStep">0/0 — 27.09.2026</div>
+
+</div>
+
+
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+
+
+
+<script>
+
+const map = L.map('map', {
+
+\&#x20; center: \\\[48.5, 36.5], zoom: 6, minZoom: 5, maxZoom: 12,
+
+\&#x20; zoomControl: false, attributionControl: false,
+
+\&#x20; maxBounds: \\\[\\\[41.5,17],\\\[55,43]], maxBoundsViscosity: 0.6
+
+});
+
+L.control.zoom({ position: 'bottomright' }).addTo(map);
+
+
+
+L.tileLayer('http://{s}.google.com/vt/lyrs=s,h\\\&x={x}\\\&y={y}\\\&z={z}', {
+
+\&#x20;   maxZoom: 20,
+
+\&#x20;   subdomains: \\\['mt0', 'mt1', 'mt2', 'mt3']
+
+}).addTo(map);
+
+
+
+const STORAGE\\\_KEY = 'frontmap\\\_google\\\_maps\\\_v18';
+
+
+
+let GREY\\\_ZONE\\\_KM = 2.0;
+
+let timelineHistory = \\\[]; 
+
+let currentStep = 0;
+
+let isPlaying = false;
+
+let playTimer = null;
+
+
+
+let userShapes = \\\[];
+
+let shapesLayerGroup = L.layerGroup().addTo(map);
+
+let rulerLayerGroup = L.layerGroup().addTo(map);
+
+let renderedPolyMap = new Map(); 
+
+
+
+function generateId() {
+
+\&#x20; return 'id\\\_' + Date.now() + '\\\_' + Math.random().toString(36).substr(2, 6);
+
+}
+
+
+
+function formatNowForInput() {
+
+\&#x20; const d = new Date();
+
+\&#x20; const year = d.getFullYear();
+
+\&#x20; const month = String(d.getMonth() + 1).padStart(2, '0');
+
+\&#x20; const day = String(d.getDate()).padStart(2, '0');
+
+\&#x20; return `${year}-${month}-${day}`;
+
+}
+
+
+
+function formatDisplayDate(dateStr) {
+
+\&#x20; if (!dateStr) return '';
+
+\&#x20; try {
+
+\&#x20;   const parts = dateStr.split('-');
+
+\&#x20;   if (parts.length === 3) {
+
+\&#x20;     return `${parts\\\[2]}.${parts\\\[1]}.${parts\\\[0]}`;
+
+\&#x20;   }
+
+\&#x20;   return dateStr;
+
+\&#x20; } catch(e) { return dateStr; }
+
+}
+
+
+
+const attackDateInput = document.getElementById('attackDateInput');
+
+attackDateInput.value = formatNowForInput();
+
+
+
+function loadState(){
+
+\&#x20; try {
+
+\&#x20;   const raw = localStorage.getItem(STORAGE\\\_KEY);
+
+\&#x20;   if (raw) {
+
+\&#x20;     const parsed = JSON.parse(raw);
+
+\&#x20;     if (parsed \\\&\\\& parsed.history \\\&\\\& parsed.history.length > 0) {
+
+\&#x20;       timelineHistory = parsed.history;
+
+\&#x20;       currentStep = timelineHistory.length - 1;
+
+\&#x20;       userShapes = JSON.parse(JSON.stringify(timelineHistory\\\[currentStep].shapes || \\\[]));
+
+\&#x20;       if (timelineHistory\\\[currentStep].date) attackDateInput.value = timelineHistory\\\[currentStep].date;
+
+\&#x20;       updateTimelineUI();
+
+\&#x20;       return;
+
+\&#x20;     }
+
+\&#x20;   }
+
+\&#x20; } catch(e) {}
+
+\&#x20; const now = formatNowForInput();
+
+\&#x20; timelineHistory = \\\[{ shapes: \\\[], date: now }];
+
+\&#x20; currentStep = 0;
+
+\&#x20; userShapes = \\\[];
+
+\&#x20; updateTimelineUI();
+
+}
+
+
+
+function saveState(){
+
+\&#x20; try {
+
+\&#x20;   localStorage.setItem(STORAGE\\\_KEY, JSON.stringify({ history: timelineHistory }));
+
+\&#x20;   const el = document.getElementById('saveHint');
+
+\&#x20;   if (el) {
+
+\&#x20;     el.textContent = 'Сохранено ✓';
+
+\&#x20;     clearTimeout(saveState.\\\_t);
+
+\&#x20;     saveState.\\\_t = setTimeout(() => { el.textContent = ''; }, 1200);
+
+\&#x20;   }
+
+\&#x20; } catch(e) {}
+
+}
+
+
+
+function pushHistoryState(newShapes) {
+
+\&#x20; if (currentStep < timelineHistory.length - 1) {
+
+\&#x20;   timelineHistory = timelineHistory.slice(0, currentStep + 1);
+
+\&#x20; }
+
+\&#x20; const dateVal = attackDateInput.value || formatNowForInput();
+
+\&#x20; timelineHistory.push({
+
+\&#x20;   shapes: JSON.parse(JSON.stringify(newShapes)),
+
+\&#x20;   date: dateVal
+
+\&#x20; });
+
+\&#x20; currentStep = timelineHistory.length - 1;
+
+\&#x20; updateTimelineUI();
+
+\&#x20; saveState();
+
+}
+
+
+
+function updateTimelineUI() {
+
+\&#x20; const slider = document.getElementById('timelineSlider');
+
+\&#x20; const stepLabel = document.getElementById('timelineStep');
+
+\&#x20; 
+
+\&#x20; slider.max = timelineHistory.length - 1;
+
+\&#x20; slider.value = currentStep;
+
+\&#x20; 
+
+\&#x20; const stepData = timelineHistory\\\[currentStep];
+
+\&#x20; const dateStr = stepData \\\&\\\& stepData.date ? formatDisplayDate(stepData.date) : '';
+
+\&#x20; stepLabel.textContent = `${currentStep}/${timelineHistory.length - 1} ${dateStr ? '— ' + dateStr : ''}`;
+
+}
+
+
+
+attackDateInput.addEventListener('change', (e) => {
+
+\&#x20; if (timelineHistory\\\[currentStep]) {
+
+\&#x20;   timelineHistory\\\[currentStep].date = e.target.value;
+
+\&#x20;   updateTimelineUI();
+
+\&#x20;   saveState();
+
+\&#x20; }
+
+});
+
+
+
+const greyZoneSlider = document.getElementById('greyZoneSlider');
+
+const greyZoneVal = document.getElementById('greyZoneVal');
+
+greyZoneSlider.addEventListener('input', (e) => {
+
+\&#x20; GREY\\\_ZONE\\\_KM = parseFloat(e.target.value);
+
+\&#x20; greyZoneVal.textContent = GREY\\\_ZONE\\\_KM.toFixed(1) + ' км';
+
+});
+
+
+
+loadState();
+
+
+
+function escapeHtml(str){
+
+\&#x20; return str.replace(/\\\[\\\&<>"']/g, c => ({'\\\&':'\\\&amp;','<':'\\\&lt;','>':'\\\&gt;','"':'\\\&quot;',"'":'\\\&#39;'}\\\[c]));
+
+}
+
+
+
+function fastResamplePolygon(pts, N = 64) {
+
+\&#x20; if (!pts || pts.length < 3) return null;
+
+\&#x20; let totalLen = 0;
+
+\&#x20; const lenList = \\\[0];
+
+\&#x20; const count = pts.length;
+
+\&#x20; 
+
+\&#x20; for (let i = 0; i < count; i++) {
+
+\&#x20;   const next = pts\\\[(i + 1) % count];
+
+\&#x20;   const d = Math.hypot(next\\\[0] - pts\\\[i]\\\[0], next\\\[1] - pts\\\[i]\\\[1]);
+
+\&#x20;   totalLen += d;
+
+\&#x20;   lenList.push(totalLen);
+
+\&#x20; }
+
+\&#x20; 
+
+\&#x20; if (totalLen === 0) return Array.from({length: N}, () => \\\[pts\\\[0]\\\[0], pts\\\[0]\\\[1]]);
+
+
+
+\&#x20; const res = new Array(N);
+
+\&#x20; let seg = 0;
+
+
+
+\&#x20; for (let i = 0; i < N; i++) {
+
+\&#x20;   const targetDist = (i / N) \\\* totalLen;
+
+\&#x20;   while (seg < count \\\&\\\& lenList\\\[seg + 1] < targetDist) seg++;
+
+\&#x20;   if (seg >= count) {
+
+\&#x20;     res\\\[i] = \\\[pts\\\[count - 1]\\\[0], pts\\\[count - 1]\\\[1]];
+
+\&#x20;   } else {
+
+\&#x20;     const segStart = lenList\\\[seg];
+
+\&#x20;     const segLen = lenList\\\[seg + 1] - segStart;
+
+\&#x20;     const t = segLen > 0 ? (targetDist - segStart) / segLen : 0;
+
+\&#x20;     const p1 = pts\\\[seg];
+
+\&#x20;     const p2 = pts\\\[(seg + 1) % count];
+
+\&#x20;     res\\\[i] = \\\[p1\\\[0] + (p2\\\[0] - p1\\\[0]) \\\* t, p1\\\[1] + (p2\\\[1] - p1\\\[1]) \\\* t];
+
+\&#x20;   }
+
+\&#x20; }
+
+\&#x20; return res;
+
+}
+
+
+
+function alignPoints(ptsA, ptsB) {
+
+\&#x20; const N = ptsA.length;
+
+\&#x20; let minSqDist = Infinity;
+
+\&#x20; let bestShift = 0;
+
+\&#x20; let bestReverse = false;
+
+
+
+\&#x20; for (let dir of \\\[1, -1]) {
+
+\&#x20;   for (let shift = 0; shift < N; shift += 2) {
+
+\&#x20;     let sqDist = 0;
+
+\&#x20;     for (let i = 0; i < N; i += 2) {
+
+\&#x20;       let bIdx = (dir === 1) ? (i + shift) % N : (N + shift - i) % N;
+
+\&#x20;       let dLat = ptsA\\\[i]\\\[0] - ptsB\\\[bIdx]\\\[0];
+
+\&#x20;       let dLng = ptsA\\\[i]\\\[1] - ptsB\\\[bIdx]\\\[1];
+
+\&#x20;       sqDist += dLat \\\* dLat + dLng \\\* dLng;
+
+\&#x20;       if (sqDist >= minSqDist) break;
+
+\&#x20;     }
+
+\&#x20;     if (sqDist < minSqDist) {
+
+\&#x20;       minSqDist = sqDist;
+
+\&#x20;       bestShift = shift;
+
+\&#x20;       bestReverse = (dir === -1);
+
+\&#x20;     }
+
+\&#x20;   }
+
+\&#x20; }
+
+
+
+\&#x20; const alignedB = new Array(N);
+
+\&#x20; for (let i = 0; i < N; i++) {
+
+\&#x20;   let bIdx = (!bestReverse) ? (i + bestShift) % N : (N + bestShift - i) % N;
+
+\&#x20;   alignedB\\\[i] = ptsB\\\[bIdx];
+
+\&#x20; }
+
+\&#x20; return alignedB;
+
+}
+
+
+
+function animateMorphPoly(mapEntry, oldPts, newPts, duration = 500, targetStyle = {}, onComplete) {
+
+\&#x20; const leafletPoly = mapEntry.poly;
+
+\&#x20; if (mapEntry.animFrameId) { cancelAnimationFrame(mapEntry.animFrameId); mapEntry.animFrameId = null; }
+
+
+
+\&#x20; if (!oldPts || oldPts.length < 3) {
+
+\&#x20;   leafletPoly.setLatLngs(newPts);
+
+\&#x20;   leafletPoly.setStyle({ ...targetStyle, opacity: 0, fillOpacity: 0 });
+
+\&#x20;   let start = performance.now();
+
+\&#x20;   function fadeIn(now) {
+
+\&#x20;     let p = Math.min(1, (now - start) / duration);
+
+\&#x20;     leafletPoly.setStyle({ opacity: p \\\* 0.9, fillOpacity: p \\\* (targetStyle.fillOpacity || 0.5) });
+
+\&#x20;     if (p < 1) mapEntry.animFrameId = requestAnimationFrame(fadeIn);
+
+\&#x20;     else { mapEntry.animFrameId = null; if (onComplete) onComplete(); }
+
+\&#x20;   }
+
+\&#x20;   mapEntry.animFrameId = requestAnimationFrame(fadeIn);
+
+\&#x20;   return;
+
+\&#x20; }
+
+
+
+\&#x20; if (!newPts || newPts.length < 3) {
+
+\&#x20;   let start = performance.now();
+
+\&#x20;   let initFillOp = targetStyle.fillOpacity || 0.5;
+
+\&#x20;   function fadeOut(now) {
+
+\&#x20;     let p = Math.min(1, (now - start) / duration);
+
+\&#x20;     leafletPoly.setStyle({ opacity: (1 - p) \\\* 0.9, fillOpacity: (1 - p) \\\* initFillOp });
+
+\&#x20;     if (p < 1) mapEntry.animFrameId = requestAnimationFrame(fadeOut);
+
+\&#x20;     else { mapEntry.animFrameId = null; if (onComplete) onComplete(); }
+
+\&#x20;   }
+
+\&#x20;   mapEntry.animFrameId = requestAnimationFrame(fadeOut);
+
+\&#x20;   return;
+
+\&#x20; }
+
+
+
+\&#x20; const N = 64;
+
+\&#x20; const resA = fastResamplePolygon(oldPts, N);
+
+\&#x20; const resB = fastResamplePolygon(newPts, N);
+
+\&#x20; const alignedB = alignPoints(resA, resB);
+
+
+
+\&#x20; if (!mapEntry.bufferPts || mapEntry.bufferPts.length !== N) {
+
+\&#x20;   mapEntry.bufferPts = Array.from({length: N}, () => \\\[0, 0]);
+
+\&#x20; }
+
+\&#x20; const currentPts = mapEntry.bufferPts;
+
+
+
+\&#x20; const startTime = performance.now();
+
+\&#x20; function easeOutCubic(x) { return 1 - Math.pow(1 - x, 3); }
+
+
+
+\&#x20; function frame(now) {
+
+\&#x20;   const progress = Math.min(1, (now - startTime) / duration);
+
+\&#x20;   const easeP = easeOutCubic(progress);
+
+
+
+\&#x20;   for (let i = 0; i < N; i++) {
+
+\&#x20;     currentPts\\\[i]\\\[0] = resA\\\[i]\\\[0] + (alignedB\\\[i]\\\[0] - resA\\\[i]\\\[0]) \\\* easeP;
+
+\&#x20;     currentPts\\\[i]\\\[1] = resA\\\[i]\\\[1] + (alignedB\\\[i]\\\[1] - resA\\\[i]\\\[1]) \\\* easeP;
+
+\&#x20;   }
+
+
+
+\&#x20;   leafletPoly.setLatLngs(currentPts);
+
+
+
+\&#x20;   if (progress < 1) {
+
+\&#x20;     mapEntry.animFrameId = requestAnimationFrame(frame);
+
+\&#x20;   } else {
+
+\&#x20;     mapEntry.animFrameId = null;
+
+\&#x20;     leafletPoly.setLatLngs(newPts);
+
+\&#x20;     if (onComplete) onComplete();
+
+\&#x20;   }
+
+\&#x20; }
+
+\&#x20; mapEntry.animFrameId = requestAnimationFrame(frame);
+
+}
+
+
+
+function renderShapesAnimated(targetShapes, speedMult = 1.0) {
+
+\&#x20; const duration = Math.min(550 / speedMult, 700);
+
+\&#x20; const nextIds = new Set(targetShapes.map(s => s.id));
+
+
+
+\&#x20; renderedPolyMap.forEach((entry, id) => {
+
+\&#x20;   if (!nextIds.has(id)) {
+
+\&#x20;     animateMorphPoly(entry, entry.points, null, duration, entry.style, () => {
+
+\&#x20;       shapesLayerGroup.removeLayer(entry.poly);
+
+\&#x20;       renderedPolyMap.delete(id);
+
+\&#x20;     });
+
+\&#x20;   }
+
+\&#x20; });
+
+
+
+\&#x20; targetShapes.forEach(s => {
+
+\&#x20;   if (s.type === 'zone') {
+
+\&#x20;     let color = '#646e7c';
+
+\&#x20;     let dashArray = null;
+
+\&#x20;     if (s.side === 'rf') color = '#d9383a';
+
+\&#x20;     else if (s.side === 'ua') color = '#2b68d8';
+
+\&#x20;     else if (s.side === 'grey') dashArray = '4,4';
+
+
+
+\&#x20;     const styleProps = {
+
+\&#x20;       fillColor: color,
+
+\&#x20;       fillOpacity: s.side === 'grey' ? 0.5 : 0.45,
+
+\&#x20;       color: color,
+
+\&#x20;       weight: 1.5,
+
+\&#x20;       dashArray: dashArray,
+
+\&#x20;       opacity: 0.9
+
+\&#x20;     };
+
+
+
+\&#x20;     if (renderedPolyMap.has(s.id)) {
+
+\&#x20;       const entry = renderedPolyMap.get(s.id);
+
+\&#x20;       entry.poly.setStyle(styleProps);
+
+\&#x20;       entry.style = styleProps;
+
+\&#x20;       animateMorphPoly(entry, entry.points, s.points, duration, styleProps);
+
+\&#x20;       entry.points = s.points;
+
+\&#x20;     } else {
+
+\&#x20;       const poly = L.polygon(s.points, styleProps);
+
+\&#x20;       poly.on('click', () => {
+
+\&#x20;         if (editMode === 'none' \\\&\\\& confirm('Удалить эту зону?')) { 
+
+\&#x20;           userShapes = userShapes.filter(item => item.id !== s.id);
+
+\&#x20;           pushHistoryState(userShapes);
+
+\&#x20;           renderShapesAnimated(userShapes, getSpeed());
+
+\&#x20;         }
+
+\&#x20;       });
+
+\&#x20;       poly.addTo(shapesLayerGroup);
+
+\&#x20;       const mapEntry = { poly, points: s.points, style: styleProps, animFrameId: null, bufferPts: null };
+
+\&#x20;       renderedPolyMap.set(s.id, mapEntry);
+
+\&#x20;       animateMorphPoly(mapEntry, null, s.points, duration, styleProps);
+
+\&#x20;     }
+
+\&#x20;   } else if (s.type === 'marker') {
+
+\&#x20;     if (!renderedPolyMap.has(s.id)) {
+
+\&#x20;       const m = L.marker(s.latlng, { icon: L.divIcon({
+
+\&#x20;         className:'', html:`<div class="pin-dot"></div><div class="pin-label">${escapeHtml(s.label)}</div>`, iconSize:\\\[10,10]
+
+\&#x20;       }) });
+
+\&#x20;       m.on('click', () => {
+
+\&#x20;         if (editMode === 'none' \\\&\\\& confirm('Удалить эту метку?')) {
+
+\&#x20;           userShapes = userShapes.filter(item => item.id !== s.id);
+
+\&#x20;           pushHistoryState(userShapes);
+
+\&#x20;           renderShapesAnimated(userShapes, getSpeed());
+
+\&#x20;         }
+
+\&#x20;       });
+
+\&#x20;       m.addTo(shapesLayerGroup);
+
+\&#x20;       renderedPolyMap.set(s.id, { poly: m, points: \\\[], style: {} });
+
+\&#x20;     }
+
+\&#x20;   }
+
+\&#x20; });
+
+}
+
+
+
+let editMode = 'none';
+
+let isDrawing = false;
+
+let zoneDraft = \\\[];
+
+let draftPreview = null;
+
+let rulerPoints = \\\[];
+
+
+
+function clearRuler() {
+
+\&#x20; rulerPoints = \\\[];
+
+\&#x20; rulerLayerGroup.clearLayers();
+
+}
+
+
+
+function setMode(mode){
+
+\&#x20; editMode = mode;
+
+\&#x20; zoneDraft = \\\[];
+
+\&#x20; if (draftPreview) { map.removeLayer(draftPreview); draftPreview = null; }
+
+\&#x20; if (mode !== 'ruler') clearRuler();
+
+
+
+\&#x20; // Управляем блокировкой перемещения карты для удобного рисования пальцем
+
+\&#x20; const mapContainer = map.getContainer();
+
+
+
+\&#x20; if (mode === 'none') {
+
+\&#x20;   map.dragging.enable();
+
+\&#x20;   map.touchZoom.enable();
+
+\&#x20;   map.doubleClickZoom.enable();
+
+\&#x20;   map.scrollWheelZoom.enable();
+
+\&#x20;   mapContainer.style.touchAction = 'none';
+
+\&#x20;   mapContainer.style.cursor = 'grab';
+
+\&#x20; } else {
+
+\&#x20;   // При рисовании отключаем перемещение/масштабирование Leaflet,
+
+\&#x20;   // чтобы палец двигал именно линию/зону.
+
+\&#x20;   map.dragging.disable();
+
+\&#x20;   map.touchZoom.disable();
+
+\&#x20;   map.doubleClickZoom.disable();
+
+\&#x20;   map.scrollWheelZoom.disable();
+
+\&#x20;   mapContainer.style.touchAction = 'none';
+
+\&#x20;   mapContainer.style.cursor = 'crosshair';
+
+\&#x20; }
+
+
+
+\&#x20; document.querySelectorAll('.ds-btn\\\[data-tool]').forEach(b => {
+
+\&#x20;   b.classList.remove('active', 'eraser-active');
+
+\&#x20;   if (b.dataset.tool === mode) {
+
+\&#x20;     if (mode === 'eraser') b.classList.add('eraser-active');
+
+\&#x20;     else b.classList.add('active');
+
+\&#x20;   }
+
+\&#x20; });
+
+}
+
+
+
+document.querySelectorAll('.ds-btn\\\[data-tool]').forEach(btn => {
+
+\&#x20; btn.addEventListener('click', () => setMode(btn.dataset.tool));
+
+});
+
+
+
+function startDrawing(latlng) {
+
+\&#x20; if (editMode === 'ruler') {
+
+\&#x20;   rulerPoints.push(\\\[latlng.lat, latlng.lng]);
+
+\&#x20;   renderRuler();
+
+\&#x20;   return;
+
+\&#x20; }
+
+
+
+\&#x20; if (editMode !== 'zone-rf' \\\&\\\& editMode !== 'zone-ua' \\\&\\\& editMode !== 'eraser') return;
+
+\&#x20; isDrawing = true;
+
+\&#x20; zoneDraft = \\\[\\\[latlng.lat, latlng.lng]];
+
+\&#x20; 
+
+\&#x20; let color = editMode === 'zone-rf' ? '#d9383a' : (editMode === 'zone-ua' ? '#2b68d8' : '#e67e22');
+
+\&#x20; if (draftPreview) map.removeLayer(draftPreview);
+
+\&#x20; draftPreview = L.polygon(zoneDraft, { color: color, weight: 2, fillColor: color, fillOpacity: 0.25, dashArray: '4,4' }).addTo(map);
+
+}
+
+
+
+let drawAnimationFrame = null;
+
+function continueDrawing(latlng) {
+
+\&#x20; if (!isDrawing) return;
+
+\&#x20; const last = zoneDraft\\\[zoneDraft.length - 1];
+
+\&#x20; const dist = Math.hypot(latlng.lat - last\\\[0], latlng.lng - last\\\[1]);
+
+\&#x20; if (dist > 0.002) { 
+
+\&#x20;   zoneDraft.push(\\\[latlng.lat, latlng.lng]);
+
+\&#x20;   if (!drawAnimationFrame) {
+
+\&#x20;     drawAnimationFrame = requestAnimationFrame(() => {
+
+\&#x20;       if (draftPreview) draftPreview.setLatLngs(zoneDraft);
+
+\&#x20;       drawAnimationFrame = null;
+
+\&#x20;     });
+
+\&#x20;   }
+
+\&#x20; }
+
+}
+
+
+
+function stopDrawing() {
+
+\&#x20; if (!isDrawing) return;
+
+\&#x20; isDrawing = false;
+
+\&#x20; 
+
+\&#x20; if (draftPreview) { map.removeLayer(draftPreview); draftPreview = null; }
+
+
+
+\&#x20; if (zoneDraft.length >= 4) {
+
+\&#x20;   if (editMode === 'eraser') {
+
+\&#x20;     processEraserZone(zoneDraft.slice());
+
+\&#x20;   } else if (editMode === 'zone-rf' || editMode === 'zone-ua') {
+
+\&#x20;     processNewZone(zoneDraft.slice(), editMode === 'zone-rf' ? 'rf' : 'ua');
+
+\&#x20;   }
+
+\&#x20; }
+
+\&#x20; zoneDraft = \\\[];
+
+}
+
+
+
+function renderRuler() {
+
+\&#x20; rulerLayerGroup.clearLayers();
+
+\&#x20; if (rulerPoints.length === 0) return;
+
+
+
+\&#x20; if (rulerPoints.length >= 3) {
+
+\&#x20;   L.polygon(rulerPoints, {
+
+\&#x20;     color: '#e67e22', weight: 2, fillColor: '#e67e22', fillOpacity: 0.2, dashArray: '4,4'
+
+\&#x20;   }).addTo(rulerLayerGroup);
+
+\&#x20; } else {
+
+\&#x20;   L.polyline(rulerPoints, { color: '#e67e22', weight: 2.5, dashArray: '6,6' }).addTo(rulerLayerGroup);
+
+\&#x20; }
+
+
+
+\&#x20; let totalDist = 0;
+
+\&#x20; rulerPoints.forEach((pt, i) => {
+
+\&#x20;   if (i > 0) {
+
+\&#x20;     totalDist += L.latLng(rulerPoints\\\[i-1]).distanceTo(L.latLng(pt));
+
+\&#x20;   }
+
+\&#x20; });
+
+
+
+\&#x20; let areaText = '';
+
+\&#x20; if (rulerPoints.length >= 3) {
+
+\&#x20;   try {
+
+\&#x20;     let polyCoords = rulerPoints.map(p => \\\[p\\\[1], p\\\[0]]);
+
+\&#x20;     polyCoords.push(\\\[...polyCoords\\\[0]]);
+
+\&#x20;     let polyGeo = turf.polygon(\\\[polyCoords]);
+
+\&#x20;     let areaM2 = turf.area(polyGeo);
+
+\&#x20;     
+
+\&#x20;     if (areaM2 >= 1000000) {
+
+\&#x20;       areaText = (areaM2 / 1000000).toFixed(2) + ' км²';
+
+\&#x20;     } else {
+
+\&#x20;       areaText = Math.round(areaM2).toLocaleString('ru-RU') + ' м²';
+
+\&#x20;     }
+
+\&#x20;   } catch(e) {}
+
+\&#x20; }
+
+
+
+\&#x20; rulerPoints.forEach((pt, i) => {
+
+\&#x20;   let labelText = '';
+
+\&#x20;   if (i === 0) {
+
+\&#x20;     labelText = 'Старт';
+
+\&#x20;   } else if (i === rulerPoints.length - 1) {
+
+\&#x20;     let distStr = totalDist >= 1000 ? (totalDist/1000).toFixed(2) + ' км' : Math.round(totalDist) + ' м';
+
+\&#x20;     labelText = areaText ? `Периметр: ${distStr} | Площадь: ${areaText}` : `Длина: ${distStr}`;
+
+\&#x20;   } else {
+
+\&#x20;     labelText = totalDist >= 1000 ? (totalDist/1000).toFixed(1) + ' км' : Math.round(totalDist) + ' м';
+
+\&#x20;   }
+
+
+
+\&#x20;   L.marker(pt, {
+
+\&#x20;     icon: L.divIcon({
+
+\&#x20;       className: 'ruler-label',
+
+\&#x20;       html: labelText,
+
+\&#x20;       iconSize: null,
+
+\&#x20;       iconAnchor: \\\[-8, 12]
+
+\&#x20;     })
+
+\&#x20;   }).addTo(rulerLayerGroup);
+
+\&#x20; });
+
+}
+
+
+
+// Универсальная обработка мыши, пальца и стилуса.
+
+// Pointer Events обходят проблемы Leaflet touch-событий на мобильных устройствах.
+
+let activePointerId = null;
+
+
+
+function getMapLatLngFromPointer(e) {
+
+\&#x20; const rect = map.getContainer().getBoundingClientRect();
+
+\&#x20; const point = L.point(
+
+\&#x20;   e.clientX - rect.left,
+
+\&#x20;   e.clientY - rect.top
+
+\&#x20; );
+
+\&#x20; return map.containerPointToLatLng(point);
+
+}
+
+
+
+function handlePointerDown(e) {
+
+\&#x20; if (activePointerId !== null) return;
+
+
+
+\&#x20; // В режиме рисования полностью забираем жест себе.
+
+\&#x20; if (editMode === 'none') return;
+
+
+
+\&#x20; e.preventDefault();
+
+\&#x20; activePointerId = e.pointerId;
+
+
+
+\&#x20; try {
+
+\&#x20;   map.getContainer().setPointerCapture(e.pointerId);
+
+\&#x20; } catch (\\\_) {}
+
+
+
+\&#x20; const latlng = getMapLatLngFromPointer(e);
+
+
+
+\&#x20; if (editMode === 'add-marker') {
+
+\&#x20;   const label = prompt('Текст метки:');
+
+\&#x20;   if (label \\\&\\\& label.trim()) {
+
+\&#x20;     userShapes.push({
+
+\&#x20;       id: generateId(),
+
+\&#x20;       type: 'marker',
+
+\&#x20;       latlng: \\\[latlng.lat, latlng.lng],
+
+\&#x20;       label: label.trim()
+
+\&#x20;     });
+
+\&#x20;     pushHistoryState(userShapes);
+
+\&#x20;     renderShapesAnimated(userShapes, getSpeed());
+
+\&#x20;   }
+
+\&#x20;   activePointerId = null;
+
+\&#x20;   try { map.getContainer().releasePointerCapture(e.pointerId); } catch (\\\_) {}
+
+\&#x20;   return;
+
+\&#x20; }
+
+
+
+\&#x20; startDrawing(latlng);
+
+}
+
+
+
+function handlePointerMove(e) {
+
+\&#x20; if (activePointerId !== e.pointerId || !isDrawing) return;
+
+
+
+\&#x20; e.preventDefault();
+
+\&#x20; const latlng = getMapLatLngFromPointer(e);
+
+\&#x20; continueDrawing(latlng);
+
+}
+
+
+
+function handlePointerUp(e) {
+
+\&#x20; if (activePointerId !== e.pointerId) return;
+
+
+
+\&#x20; e.preventDefault();
+
+\&#x20; stopDrawing();
+
+
+
+\&#x20; try { map.getContainer().releasePointerCapture(e.pointerId); } catch (\\\_) {}
+
+\&#x20; activePointerId = null;
+
+}
+
+
+
+function handlePointerCancel(e) {
+
+\&#x20; if (activePointerId !== e.pointerId) return;
+
+
+
+\&#x20; stopDrawing();
+
+\&#x20; try { map.getContainer().releasePointerCapture(e.pointerId); } catch (\\\_) {}
+
+\&#x20; activePointerId = null;
+
+}
+
+
+
+const mapContainer = map.getContainer();
+
+
+
+// Не отдаём браузеру жесты страницы во время рисования.
+
+mapContainer.addEventListener('pointerdown', handlePointerDown, { passive: false });
+
+mapContainer.addEventListener('pointermove', handlePointerMove, { passive: false });
+
+mapContainer.addEventListener('pointerup', handlePointerUp, { passive: false });
+
+mapContainer.addEventListener('pointercancel', handlePointerCancel, { passive: false });
+
+
+
+// На всякий случай блокируем контекстное меню при рисовании на телефоне/планшете.
+
+mapContainer.addEventListener('contextmenu', e => {
+
+\&#x20; if (editMode !== 'none') e.preventDefault();
+
+});
+
+
+
+function toTurfPoly(pts) {
+
+\&#x20; let coords = pts.map(p => \\\[p\\\[1], p\\\[0]]);
+
+\&#x20; if (coords\\\[0]\\\[0] !== coords\\\[coords.length - 1]\\\[0] || coords\\\[0]\\\[1] !== coords\\\[coords.length - 1]\\\[1]) {
+
+\&#x20;   coords.push(\\\[...coords\\\[0]]);
+
+\&#x20; }
+
+\&#x20; return turf.polygon(\\\[coords]);
+
+}
+
+
+
+function addTurfToShapes(targetArr, turfGeoJSON, side, targetId = null) {
+
+\&#x20; if (!turfGeoJSON || !turfGeoJSON.geometry) return;
+
+\&#x20; const type = turfGeoJSON.geometry.type;
+
+\&#x20; 
+
+\&#x20; if (type === 'Polygon') {
+
+\&#x20;   const pts = turfGeoJSON.geometry.coordinates\\\[0].slice(0, -1).map(p => \\\[p\\\[1], p\\\[0]]);
+
+\&#x20;   if (pts.length >= 3) targetArr.push({ id: targetId || generateId(), type: 'zone', side, points: pts });
+
+\&#x20; } else if (type === 'MultiPolygon') {
+
+\&#x20;   turfGeoJSON.geometry.coordinates.forEach((polyCoords, idx) => {
+
+\&#x20;     const pts = polyCoords\\\[0].slice(0, -1).map(p => \\\[p\\\[1], p\\\[0]]);
+
+\&#x20;     if (pts.length >= 3) targetArr.push({ id: (idx === 0 \\\&\\\& targetId) ? targetId : generateId(), type: 'zone', side, points: pts });
+
+\&#x20;   });
+
+\&#x20; }
+
+}
+
+
+
+function processEraserZone(drawnPoints) {
+
+\&#x20; if (typeof turf === 'undefined' || drawnPoints.length < 3) return;
+
+
+
+\&#x20; let eraserPoly;
+
+\&#x20; try { eraserPoly = toTurfPoly(drawnPoints); } catch(e) { return; }
+
+
+
+\&#x20; let nextShapes = JSON.parse(JSON.stringify(userShapes));
+
+\&#x20; let modified = false;
+
+
+
+\&#x20; for (let i = nextShapes.length - 1; i >= 0; i--) {
+
+\&#x20;   let shape = nextShapes\\\[i];
+
+\&#x20;   if (shape.type !== 'zone') continue;
+
+
+
+\&#x20;   try {
+
+\&#x20;     const existingZone = toTurfPoly(shape.points);
+
+\&#x20;     if (turf.intersect(existingZone, eraserPoly)) {
+
+\&#x20;       const remainingZone = turf.difference(existingZone, eraserPoly);
+
+\&#x20;       const origId = shape.id;
+
+\&#x20;       nextShapes.splice(i, 1);
+
+\&#x20;       if (remainingZone) addTurfToShapes(nextShapes, remainingZone, shape.side, origId);
+
+\&#x20;       modified = true;
+
+\&#x20;     }
+
+\&#x20;   } catch(e) {}
+
+\&#x20; }
+
+
+
+\&#x20; if (modified) {
+
+\&#x20;   userShapes = nextShapes;
+
+\&#x20;   pushHistoryState(userShapes);
+
+\&#x20;   renderShapesAnimated(userShapes, getSpeed());
+
+\&#x20; }
+
+}
+
+
+
+function processNewZone(drawnPoints, newSide) {
+
+\&#x20; if (typeof turf === 'undefined') return;
+
+
+
+\&#x20; let nextShapes = JSON.parse(JSON.stringify(userShapes));
+
+
+
+\&#x20; let newPoly;
+
+\&#x20; try { newPoly = toTurfPoly(drawnPoints); } catch (e) { return; }
+
+
+
+\&#x20; const enemySide = newSide === 'rf' ? 'ua' : 'rf';
+
+
+
+\&#x20; for (let i = nextShapes.length - 1; i >= 0; i--) {
+
+\&#x20;   let shape = nextShapes\\\[i];
+
+\&#x20;   if (shape.type === 'zone' \\\&\\\& shape.side === newSide) {
+
+\&#x20;     try {
+
+\&#x20;       const existingPoly = toTurfPoly(shape.points);
+
+\&#x20;       if (turf.intersect(newPoly, existingPoly)) {
+
+\&#x20;         const unioned = turf.union(newPoly, existingPoly);
+
+\&#x20;         if (unioned) {
+
+\&#x20;           newPoly = unioned;
+
+\&#x20;           nextShapes.splice(i, 1);
+
+\&#x20;         }
+
+\&#x20;       }
+
+\&#x20;     } catch (e) {}
+
+\&#x20;   }
+
+\&#x20; }
+
+
+
+\&#x20; let bufferedNew;
+
+\&#x20; if (GREY\\\_ZONE\\\_KM > 0) {
+
+\&#x20;   try {
+
+\&#x20;     bufferedNew = turf.buffer(newPoly, GREY\\\_ZONE\\\_KM, { units: 'kilometers' });
+
+\&#x20;   } catch (e) {
+
+\&#x20;     bufferedNew = newPoly;
+
+\&#x20;   }
+
+\&#x20; } else {
+
+\&#x20;   bufferedNew = newPoly;
+
+\&#x20; }
+
+
+
+\&#x20; let greyRing = null;
+
+\&#x20; if (GREY\\\_ZONE\\\_KM > 0) {
+
+\&#x20;   try { greyRing = turf.difference(bufferedNew, newPoly); } catch (e) {}
+
+\&#x20; }
+
+
+
+\&#x20; for (let i = nextShapes.length - 1; i >= 0; i--) {
+
+\&#x20;   let shape = nextShapes\\\[i];
+
+\&#x20;   if (shape.type !== 'zone') continue;
+
+
+
+\&#x20;   if (shape.side === 'grey') {
+
+\&#x20;     try {
+
+\&#x20;       const existingGrey = toTurfPoly(shape.points);
+
+\&#x20;       const remainingGrey = turf.difference(existingGrey, newPoly);
+
+\&#x20;       const origId = shape.id;
+
+\&#x20;       nextShapes.splice(i, 1);
+
+\&#x20;       if (remainingGrey) addTurfToShapes(nextShapes, remainingGrey, 'grey', origId);
+
+\&#x20;     } catch (e) {}
+
+\&#x20;   } else if (shape.side === enemySide) {
+
+\&#x20;     try {
+
+\&#x20;       const existingEnemy = toTurfPoly(shape.points);
+
+\&#x20;       
+
+\&#x20;       if (greyRing) {
+
+\&#x20;         const createdGrey = turf.intersect(existingEnemy, greyRing);
+
+\&#x20;         if (createdGrey) addTurfToShapes(nextShapes, createdGrey, 'grey');
+
+\&#x20;       }
+
+
+
+\&#x20;       const remainingEnemy = turf.difference(existingEnemy, bufferedNew);
+
+\&#x20;       const origId = shape.id;
+
+\&#x20;       nextShapes.splice(i, 1);
+
+\&#x20;       if (remainingEnemy) addTurfToShapes(nextShapes, remainingEnemy, enemySide, origId);
+
+\&#x20;     } catch (e) {}
+
+\&#x20;   }
+
+\&#x20; }
+
+
+
+\&#x20; addTurfToShapes(nextShapes, newPoly, newSide);
+
+
+
+\&#x20; userShapes = nextShapes;
+
+\&#x20; pushHistoryState(userShapes);
+
+\&#x20; renderShapesAnimated(userShapes, getSpeed());
+
+}
+
+
+
+const timelineSlider = document.getElementById('timelineSlider');
+
+const playBtn = document.getElementById('playBtn');
+
+const speedSelect = document.getElementById('speedSelect');
+
+
+
+function getSpeed() {
+
+\&#x20; return parseFloat(speedSelect.value) || 1.0;
+
+}
+
+
+
+timelineSlider.addEventListener('input', (e) => {
+
+\&#x20; const targetStep = parseInt(e.target.value, 10);
+
+\&#x20; if (targetStep !== currentStep) {
+
+\&#x20;   currentStep = targetStep;
+
+\&#x20;   const stepData = timelineHistory\\\[currentStep];
+
+\&#x20;   userShapes = JSON.parse(JSON.stringify(stepData.shapes || \\\[]));
+
+\&#x20;   if (stepData.date) attackDateInput.value = stepData.date;
+
+\&#x20;   updateTimelineUI();
+
+\&#x20;   renderShapesAnimated(userShapes, getSpeed());
+
+\&#x20; }
+
+});
+
+
+
+playBtn.addEventListener('click', () => {
+
+\&#x20; if (isPlaying) {
+
+\&#x20;   stopPlay();
+
+\&#x20; } else {
+
+\&#x20;   startPlay();
+
+\&#x20; }
+
+});
+
+
+
+function stepForward() {
+
+\&#x20; if (currentStep < timelineHistory.length - 1) {
+
+\&#x20;   currentStep++;
+
+\&#x20;   const stepData = timelineHistory\\\[currentStep];
+
+\&#x20;   userShapes = JSON.parse(JSON.stringify(stepData.shapes || \\\[]));
+
+\&#x20;   if (stepData.date) attackDateInput.value = stepData.date;
+
+\&#x20;   updateTimelineUI();
+
+\&#x20;   renderShapesAnimated(userShapes, getSpeed());
+
+\&#x20;   
+
+\&#x20;   const interval = Math.max(250, 1000 / getSpeed());
+
+\&#x20;   playTimer = setTimeout(stepForward, interval);
+
+\&#x20; } else {
+
+\&#x20;   stopPlay();
+
+\&#x20; }
+
+}
+
+
+
+function startPlay() {
+
+\&#x20; if (timelineHistory.length <= 1) return;
+
+\&#x20; isPlaying = true;
+
+\&#x20; playBtn.textContent = '⏸';
+
+\&#x20; 
+
+\&#x20; if (currentStep >= timelineHistory.length - 1) {
+
+\&#x20;   currentStep = 0;
+
+\&#x20; }
+
+
+
+\&#x20; stepForward();
+
+}
+
+
+
+function stopPlay() {
+
+\&#x20; isPlaying = false;
+
+\&#x20; playBtn.textContent = '▶';
+
+\&#x20; if (playTimer) clearTimeout(playTimer);
+
+}
+
+
+
+document.getElementById('undoBtn').addEventListener('click', () => {
+
+\&#x20; if (currentStep > 0) {
+
+\&#x20;   currentStep--;
+
+\&#x20;   const stepData = timelineHistory\\\[currentStep];
+
+\&#x20;   userShapes = JSON.parse(JSON.stringify(stepData.shapes || \\\[]));
+
+\&#x20;   if (stepData.date) attackDateInput.value = stepData.date;
+
+\&#x20;   updateTimelineUI();
+
+\&#x20;   renderShapesAnimated(userShapes, getSpeed());
+
+\&#x20; }
+
+});
+
+
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+
+\&#x20; if (confirm('Сбросить все правки и полностью очистить карту?')) {
+
+\&#x20;   try { localStorage.removeItem(STORAGE\\\_KEY); } catch(e) {}
+
+\&#x20;   location.reload();
+
+\&#x20; }
+
+});
+
+
+
+renderShapesAnimated(userShapes, 1.0);
+
+
+</body>
+
+</html>
+
